@@ -1,4 +1,4 @@
-# Universal Audio Plugin Template — Claude Code Workflow
+# Audio Plugin Building — Claude Code Workflow
 
 A complete Claude Code workflow package for building professional-grade JUCE 8 audio
 plugins (AU + VST3, macOS + Windows, Apple Silicon + Intel) from architecture through
