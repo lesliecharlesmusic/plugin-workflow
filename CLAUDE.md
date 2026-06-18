@@ -1,0 +1,364 @@
+# CLAUDE.md — [PLUGIN NAME] Plugin Project
+
+> Fill every [BRACKETED FIELD] before first use. This file is always in context in Claude Code.
+> Skills are loaded on demand — CLAUDE.md routes to them. Do not paste skill content here.
+
+---
+
+## 1. Project Identity
+
+| Field | Value |
+|---|---|
+| Plugin Name | [PLUGIN NAME] |
+| Manufacturer | [MANUFACTURER NAME] |
+| Manufacturer Code | [4-CHAR e.g. LCSC] |
+| Plugin Code | [4-CHAR e.g. PLGB] |
+| Version | [e.g. 1.0.0] |
+| Category | [Distortion / EQ / Compressor / Reverb / Delay / Modulation / Synth] |
+| Formats | AU + VST3 |
+| JUCE Path | [/Users/you/DEV/JUCE] |
+| JUCE Version | [8.0.12] |
+| Project Root | [/Users/you/DEV/PluginName] |
+| Build Output | [/Users/you/DEV/PluginName/Build] |
+| macOS Target | [12.0] |
+| Xcode Version | [16.x] |
+| CPU Target | Universal Binary (arm64 + x86_64) |
+
+---
+
+## 2. Current Status
+
+```
+CURRENT PHASE : [0]   ← one line of state, updated every session
+PHASE STATUS  : [NOT STARTED / IN PROGRESS / COMPLETE]
+BLOCKING ISSUE: [none / describe if blocked]
+```
+
+This is the ONLY thing about "phase" that is stateful. The phase roadmap itself
+(Section 3 below) is fixed and never changes — it's the process, not the state.
+
+---
+
+## 3. Phase Roadmap & Skill Router (Fixed Process — Never Edit This Table)
+
+This describes the process, not the project's current state. It never needs updating.
+Claude reads this to know which skill to load and what each phase's gate condition is.
+**Never skip a phase. Never load a skill for a future phase.**
+
+| Phase | Name | Skill to Load | Gate Before Starting |
+|---|---|---|---|
+| 0 | Project Setup | *(no skill — Section 6 below)* | Toolchain installed |
+| 1 | Architecture & Research | `dsp-research` | Phase 0 complete |
+| 2 | CMake + JUCE Skeleton | `build-system` | DSP_Design.md + Software_Architecture.md exist |
+| 3 | Parameter Architecture | `plugin-architecture` | Phase 2 compiles, Build_Config.md current |
+| 4 | Core DSP Engine | `dsp-implementation` | Parameters.md exists and approved |
+| 5 | Advanced DSP | `dsp-implementation` | Phase 4 DSP classes implemented + unit tested |
+| 6 | UI Design (HTML) | `plugin-ui` | Phase 5 DSP stable |
+| 7 | JUCE GUI | `plugin-ui` | HTML prototype approved in UI_Design.md |
+| 8 | Preset System | `plugin-architecture` | Phase 7 GUI complete |
+| 9 | Optimization | `plugin-optimization` | Presets.md current, unit tests passing |
+| 10 | QA & DAW Validation | `plugin-qa` | Golden reference tests passing (`dsp-testing`) |
+| B | Beta Testing | *(no skill — `Docs/BetaTesting.md`)* | Phase 10 hard blockers pass |
+| R | Release & Distribution | `plugin-release` | Beta exit criteria met |
+
+**Testing (continuous, not a phase):** Load `dsp-testing` after any DSP file change, and mandatorily before Phase R.
+**Debugging (any phase):** Load `plugin-debugging`
+
+---
+
+## 4. Non-Negotiable Rules (Always Enforced)
+
+These apply in every phase, every file, every session:
+
+### Audio Thread
+- Zero heap allocations in `processBlock` — pre-allocate everything in `prepareToPlay`
+- Zero locks or mutexes on audio thread
+- Zero file I/O or logging on audio thread
+- `ScopedNoDenormals` is the FIRST line of `processBlock`
+- Cache all `getRawParameterValue` pointers in `prepareToPlay` — never inside `processBlock`
+- Circular buffers use power-of-2 sizes with bitmask indexing — no `%` modulo
+- Use `applyGainRamp`, never `applyGain`, at block boundaries
+
+### Filter State
+- Own the biquad completely: coefficients AND state in one struct
+- Direct Form I: `y = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2` with your own `x1,x2,y1,y2` per channel
+- Do NOT use `juce::dsp::ProcessorDuplicator` for per-sample coefficient updates
+- Do NOT call `filter.reset()` on coefficient changes — only on `prepareToPlay` or transport reset
+
+### Parameter Smoothing
+- Every automatable audio-affecting parameter uses `SmoothedValue<float, Linear>`
+- Call `getNextValue()` exactly once per sample
+- Filter cutoff: interpolate coefficients per-block via SmoothedValue on the frequency
+
+### GUI Thread Safety
+- Editor destructor resets all dynamic `SliderParameterAttachment` objects **FIRST**
+- Destructor order: (1) reset all attachments → (2) `stopTimer()` → (3) `setLookAndFeel(nullptr)`
+- All preset load/save on message thread only
+- All APVTS `copyState`/`replaceState` on message thread only
+
+### Build Rules
+- Generate ONE file per response — explain it, wait for approval, then next file
+- Run Verification Loop (Section 7) after every generated file
+- Never run `xcodebuild` against empty `.cpp` files
+- After every Release build: `lipo -info` must show both `x86_64` and `arm64`
+- AU type: `kAudioUnitType_MusicEffect` (aumf) with `NEEDS_MIDI_INPUT TRUE`
+- `COPY_PLUGIN_AFTER_BUILD FALSE` — copy manually
+
+### Code Generation
+- No TODO stubs — all functions fully implemented
+- No prototype shortcuts
+- File header comment on every file: purpose + dependencies
+- `#pragma once` on every header
+
+### Testing
+- Every DSP class gets a unit test before being considered complete (load `dsp-testing`)
+- Golden reference regression run before every release — failures must be explained, not silently overwritten
+
+---
+
+## 5. Plugin Specification Summary
+
+> Full spec lives in `Docs/PluginSpec.md`. This is the quick-reference extract.
+
+**Sonic Identity:** [2-3 sentence description of the sound and feel]
+
+**Stereo Topology:** [True Stereo / Dual Mono / Mono-in Stereo-out]
+
+**Oversampling:** [None / 2x / 4x / User-selectable]
+
+**Nonlinear Processing:** [brief description]
+
+**Key Controls:** *(full list lives in `Docs/State/Parameters.md` — that is the source of truth once Phase 3 begins)*
+
+**UI:** [brief visual theme, window size — full detail in `Docs/State/UI_Design.md`]
+
+**Preset System:** [User / Factory / Both / None — full detail in `Docs/State/Presets.md`]
+
+**Reference Plugins:** [list]
+
+---
+
+## 6. Phase 0 Checklist (No Skill Required)
+
+Run once. Check off each item.
+
+- [ ] JUCE 8 installed at `[JUCE PATH]`
+- [ ] CMake 3.22+ installed (`cmake --version`)
+- [ ] Xcode installed with command-line tools (`xcode-select --install`)
+- [ ] Git installed (`git --version`)
+- [ ] `pluginval` downloaded
+- [ ] Logic Pro available for AU testing
+- [ ] Reaper or Ableton available for VST3 testing
+- [ ] GitHub repo created (see `Docs/GitHub.md`)
+- [ ] `Docs/PluginSpec.md` fully completed
+- [ ] This `CLAUDE.md` fully filled in
+- [ ] All files in `Docs/State/` initialised (templates already in place)
+- [ ] Phase status updated to: Phase 1 / NOT STARTED
+
+---
+
+## 7. Verification Loop (Run After Every Generated File)
+
+```
+QA self-inspection of file just generated:
+1. Realtime safety violations? (allocation, locks, IO in processBlock)
+2. Thread safety risks between audio thread and GUI thread?
+3. JUCE 8 compatibility issues?
+4. Apple Silicon / ARM64 issues?
+5. Parameter smoothing — sample-accurate?
+6. Denormal risks in any IIR filters?
+7. Memory leaks or ownership issues?
+8. Automation edge cases at min/max parameter values?
+9. getRawParameterValue pointers cached in prepareToPlay?
+10. Editor destructor resets attachments before stopTimer/setLookAndFeel?
+
+Rate each: PASS / WARNING / FAIL
+Fix all FAILs before compiling.
+```
+
+---
+
+## 8. State Document Protocol (Replaces Phase Handoffs)
+
+There are no per-phase handoff files. Instead, six living documents in `Docs/State/`
+each hold the CURRENT truth for one domain. Edit them in place. Never let two documents
+disagree about the same fact — if you find a contradiction, fix it immediately.
+
+| Domain | File | Edited During |
+|---|---|---|
+| DSP design & signal flow | `Docs/State/DSP_Design.md` | Phase 1, 4, 5, 9 |
+| Class structure & threading | `Docs/State/Software_Architecture.md` | Phase 1, 2, 3, 8 |
+| Parameter IDs & ranges | `Docs/State/Parameters.md` | Phase 3 (frozen after release) |
+| CMake & build state | `Docs/State/Build_Config.md` | Phase 2, 9, R |
+| Visual design & GUI state | `Docs/State/UI_Design.md` | Phase 6, 7 |
+| Preset architecture | `Docs/State/Presets.md` | Phase 8 |
+| History of WHY things changed | `Docs/State/Changelog.md` | Every phase — append only |
+
+### At the start of every session:
+```
+Read Docs/State/[relevant domain files for this phase].
+Read Docs/PluginSpec.md (relevant sections).
+Confirm current state before generating anything.
+```
+
+### After any change to a domain:
+```
+1. Open Docs/State/[Domain].md
+2. Update the relevant section IN PLACE — replace stale content, don't append
+3. Append one line to Docs/State/Changelog.md:
+   [date] [Phase N] [Domain]: what changed — why
+```
+
+### Architecture Review (run every 3-4 phases, fresh conversation)
+```
+Architecture Review — do not generate code.
+Read all files in Docs/State/.
+Identify:
+1. Contradictions between state documents
+2. Architectural drift from Docs/PluginSpec.md
+3. Naming inconsistencies across files
+4. Thread safety risks not yet addressed
+5. Recommended corrections before continuing
+Recommendations only — no code.
+```
+
+---
+
+## 9. Debugging Protocol
+
+When a build error, crash, or DSP bug occurs:
+
+1. Stop the current phase conversation
+2. Open a new conversation
+3. Load `plugin-debugging` skill
+4. Paste: error + relevant file + line numbers
+5. Fix only the broken lines — do not regenerate whole files
+6. If the fix reveals a deeper issue, update the relevant `Docs/State/*.md` file and log it in `Changelog.md`
+7. Return to phase conversation with the fix applied
+
+---
+
+## 10. Testing Protocol
+
+After any DSP file is written or modified:
+```
+Load .claude/skills/dsp-testing/SKILL.md
+Write/update unit tests for the changed class.
+Run the test target. All tests must pass before moving on.
+```
+
+Before every release (mandatory gate, not optional):
+```
+Load .claude/skills/dsp-testing/SKILL.md
+Run Docs/GoldenReference/render_and_diff.py against the current build.
+Any failure: investigate (load plugin-debugging) or explicitly approve
+and log the change in Docs/State/Changelog.md. Never silently overwrite
+golden references.
+```
+
+---
+
+## 11. Cross-Tool Routing
+
+| Task | Tool |
+|---|---|
+| All DSP C++ code | Claude Code only |
+| Architecture, threading, debugging | Claude Code only |
+| Verifying offloaded equations | Claude Code (use Research Intake prompt in `Docs/CrossToolHandoff.md`) |
+| DSP literature research | Gemini Deep Research → verify on Claude |
+| Manual prose, marketing copy | ChatGPT/Gemini → fact-check |
+| Logo, textures, icons | ChatGPT/Gemini image gen |
+| HTML UI mockup (Phase 6) | Claude Code (or ChatGPT, approved mockup returns here) |
+| Generic git/CMake questions | Free ChatGPT/Gemini |
+| Parameter tables, test logs | ChatGPT/Gemini Sheets → paste final data back |
+
+Full handoff templates: `Docs/CrossToolHandoff.md`
+
+---
+
+## 12. Known JUCE 8 Gotchas (Quick Reference)
+
+- `IIR::Filter.state` is PRIVATE — own your biquad
+- `IIR::Filter.processors` is PRIVATE — cannot iterate per-channel filters
+- `ProcessorDuplicator` has no `processSample()` — block-mode only
+- `SmoothedValue.getNextValue()` advances the smoother — call once per sample only
+- `applyGain()` is constant — use `applyGainRamp()` when gain may have changed
+- `AudioBuffer` stack allocation inside `processBlock` = heap allocation — pre-allocate as member
+- `HeapBlock` inside `processBlock` = heap allocation — pre-allocate as member
+- `ScopedNoDenormals` scope starts where declared — must be first line
+
+---
+
+## 13. File & Folder Structure
+
+```
+[PluginName]/
+├── CLAUDE.md                          ← this file (always in context)
+├── CMakeLists.txt
+├── .github/workflows/build.yml
+├── .gitignore
+├── Source/
+│   ├── Core/
+│   ├── DSP/
+│   ├── Parameters/
+│   │   ├── ParameterIDs.h
+│   │   └── ParameterLayout.h/.cpp
+│   ├── GUI/
+│   │   └── LookAndFeel.h
+│   └── Presets/
+│       └── PresetManager.h/.cpp
+├── Tests/
+│   ├── BiquadTests.cpp
+│   ├── SmoothingTests.cpp
+│   └── OfflineRenderHarness.cpp
+├── Assets/
+│   └── IR/
+├── Docs/
+│   ├── PluginSpec.md                  ← full Part 2 spec
+│   ├── CrossToolHandoff.md            ← handoff templates
+│   ├── GitHub.md                      ← CI/CD setup guide
+│   ├── BetaTesting.md                 ← beta process
+│   ├── GoldenReference/
+│   │   ├── README.md
+│   │   ├── inputs/
+│   │   └── expected/v[X.Y.Z]/
+│   └── State/                         ← LIVING docs, edited in place
+│       ├── DSP_Design.md
+│       ├── Software_Architecture.md
+│       ├── Parameters.md
+│       ├── Build_Config.md
+│       ├── UI_Design.md
+│       ├── Presets.md
+│       └── Changelog.md               ← the ONLY append-only file
+└── .claude/
+    └── skills/
+        ├── dsp-research/SKILL.md
+        ├── plugin-architecture/SKILL.md
+        ├── build-system/SKILL.md
+        ├── dsp-implementation/SKILL.md
+        │   └── references/
+        │       ├── realtime-safety.md
+        │       └── biquad-patterns.md
+        ├── dsp-testing/SKILL.md
+        ├── plugin-ui/SKILL.md
+        ├── plugin-qa/SKILL.md
+        │   └── references/
+        │       └── daw-validation-checklist.md
+        ├── plugin-optimization/SKILL.md
+        ├── plugin-debugging/SKILL.md
+        └── plugin-release/SKILL.md
+```
+
+---
+
+## 14. Version Control
+
+- Develop on version branches: `v1.0.0-dev`, `v1.0.1-dev`
+- Merge to `main` only to trigger GitHub Actions CI
+- **Bump version on every rebuild that changes `isBusesLayoutSupported()`** — Logic caches by version
+- Tag every release: `git tag vX.Y.Z && git push origin vX.Y.Z`
+- Version must match in: `CMakeLists.txt`, `PluginProcessor`, `PluginEditor`, About window, manual, bundle
+
+---
+
+*Last updated: [DATE] | Template v2.4*
