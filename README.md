@@ -18,7 +18,7 @@ I'm not a professional software engineer. I'm a musician, producer, and recordin
 engineer. This workflow started as a way to teach myself DSP and audio programming in
 C++, and to understand how audio plugins actually get built, while making small tools
 that genuinely help my own creative process. It's a hobby project, built for learning
-and personal use, not a commercial engineering effort. If you're coming at this from a
+and personal use, not a commercial effort. If you're coming at this from a
 musical background rather than a computer science one, this was built with you in mind.
 
 I have real respect for the engineers doing this professionally, the people behind the
