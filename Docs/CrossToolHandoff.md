@@ -112,12 +112,14 @@ Deliver a complete single HTML file.
 ```
 
 After iteration and approval in ChatGPT, bring the final HTML back to Claude Code
-for Phase 7 JUCE translation. Paste it with:
+to start Phase 7. Paste it with:
 
 ```
-The HTML prototype below has been approved. 
+The HTML prototype below has been approved.
 Begin Phase 7. Load .claude/skills/plugin-ui/SKILL.md.
-Translate this approved design to JUCE — starting with LookAndFeel.h only.
+Produce Docs/State/UI_Implementation.md first (Step 0 — file order, component
+inventory, colour/font constants, data flow, verification checklist). Do not
+generate any JUCE file, including LookAndFeel.h, until that document is approved.
 
 [PASTE APPROVED HTML]
 ```

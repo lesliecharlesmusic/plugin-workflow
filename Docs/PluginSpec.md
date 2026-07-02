@@ -1,6 +1,6 @@
 # Plugin Specification — [PLUGIN NAME]
 
-> Complete every field before Phase 1. This is the single source of truth for all skills.
+> Complete every field before Phase 1A. This is the single source of truth for all skills.
 > Skills reference this file directly rather than requiring you to re-paste spec content.
 
 ---

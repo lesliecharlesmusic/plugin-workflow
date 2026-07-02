@@ -44,12 +44,12 @@ Unlike a fixed-phase checklist, this workflow tracks **state**, not just **proce
 
 | Skill | Phase | Purpose |
 |---|---|---|
-| `dsp-research` | 1A | DSP design document, transfer functions, signal flow |
+| `dsp-research` | 1A | DSP design document (decisions only), high-level transfer functions, signal flow |
 | `plugin-architecture` | 1B, 3, 8 | Software architecture, parameters, presets |
 | `build-system` | 2 | CMake, JUCE skeleton, universal binary, CI |
-| `dsp-implementation` | 4, 5 | Core DSP, oversampling, real-time safety |
+| `dsp-implementation` | 4, 5 | Pre-code gate (`DSP_Implementation.md`) + core DSP, oversampling, real-time safety |
 | `dsp-testing` | continuous | Unit tests + golden reference regression — runs after every DSP change |
-| `plugin-ui` | 6, 7 | HTML prototype gate, JUCE GUI implementation |
+| `plugin-ui` | 6, 7 | HTML prototype gate + pre-code gate (`UI_Implementation.md`) + JUCE GUI implementation |
 | `plugin-optimization` | 9 | SIMD, CPU profiling, branch reduction |
 | `plugin-qa` | 10 | Full DAW validation checklist, auval, crash resilience |
 | `plugin-debugging` | any | Forensic debugging — compiler errors, crashes, artifacts |
