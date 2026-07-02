@@ -12,6 +12,24 @@ looking for the open-ended DSP research counterpart to this repo, see
 
 ---
 
+## Why This Exists
+
+I'm not a professional software engineer. I'm a musician, producer, and recording/mixing
+engineer. This workflow started as a way to teach myself DSP and audio programming in
+C++, and to understand how audio plugins actually get built, while making small tools
+that genuinely help my own creative process. It's a hobby project, built for learning
+and personal use, not a commercial engineering effort. If you're coming at this from a
+musical background rather than a computer science one, this was built with you in mind.
+
+I have real respect for the engineers doing this professionally, the people behind the
+plugins we all use every day. Their work reflects years of formal training, experience
+earned the hard way, and judgment that no workflow can shortcut. This process can help
+me aim toward that standard of craft, but it can't replace it. AI can accelerate how
+fast I learn and how much I can build. It can't generate wisdom, experience, or the
+years it takes to earn either.
+
+---
+
 ## What's Here
 
 ```
