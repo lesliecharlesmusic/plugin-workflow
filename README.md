@@ -23,7 +23,7 @@ looking for the open-ended DSP research counterpart to this repo, see
 │   ├── GitHub.md               CI/CD setup guide (GitHub Actions Windows build)
 │   ├── BetaTesting.md          Pre-release field testing process
 │   ├── GoldenReference/        Audio regression test fixtures
-│   └── State/                  Living documents — DSP design, architecture, parameters, etc.
+│   └── State/                  Living documents — DSP/UI decisions + build specs, architecture, parameters, etc.
 ├── Tests/                      Catch2 unit test scaffold
 └── .claude/skills/             10 on-demand skills covering the full plugin lifecycle
 ```
@@ -39,6 +39,10 @@ Unlike a fixed-phase checklist, this workflow tracks **state**, not just **proce
   something mid-phase
 - `Docs/State/Changelog.md` is the only append-only file — the historical record of *why*
   things changed
+- DSP and UI each split into a Design doc (decisions — what and why, no code) and an
+  Implementation doc (a build spec — how). The Implementation doc is a mandatory pre-code
+  gate produced right before its code phase starts, regardless of plugin size — not
+  optional ceremony for "simple enough" plugins
 
 ## Skills
 
@@ -62,9 +66,8 @@ Unlike a fixed-phase checklist, this workflow tracks **state**, not just **proce
 3. Open the folder in your IDE, open Claude Code from inside that workspace
 4. First message: `Read CLAUDE.md and confirm you have it. List the phase roadmap from § 3.`
 
-Full first-session script in `GettingStarted.docx` (generated separately — see project
-history) or just ask Claude Code to read `CLAUDE.md § 6` and walk the Phase 0 checklist
-with you.
+Full first-session script in `Getting_Started.pdf` (repo root) or just ask Claude Code to
+read `CLAUDE.md § 6` and walk the Phase 0 checklist with you.
 
 ## Non-Negotiable Rules (Enforced Throughout)
 
@@ -72,6 +75,7 @@ with you.
 - Own all filter state — never rely on JUCE's private internals
 - Every automatable parameter is smoothed
 - Editor destructor resets attachments before `stopTimer()`/`setLookAndFeel(nullptr)`
+- No DSP `.cpp` or JUCE GUI file before its Implementation doc (pre-code gate) is approved
 - One file generated per response, verified before the next
 - Golden reference regression must pass before every release — failures are investigated,
   never silently overwritten
