@@ -52,6 +52,11 @@ SmoothedValues            LookAndFeel
 - Who owns what (unique_ptr vs raw)
 - Destructor ordering rationale
 - No naked `new` or `delete`
+- Owner of every derived/smoothed display value (calibrated meter reading, eased display
+  number) — name it explicitly here. The moment more than one GUI component needs the same
+  derived value, this section is what stops a second component from re-deriving it (see
+  `CLAUDE.md § 4` State Ownership) — that duplication is the most common recurring bug class
+  in this workflow's project history.
 
 **7. Oversampling Integration**
 - Where in the signal chain
@@ -71,7 +76,7 @@ SmoothedValues            LookAndFeel
 
 Once approved, write this document into `Docs/State/Software_Architecture.md`
 (replace placeholder content section by section). Append one line to
-`Docs/State/Changelog.md`: `[date] [Phase 1] Software_Architecture: initial architecture approved`.
+`Docs/State/Changelog.md`: `[date] [Phase 1B] Software_Architecture: initial architecture approved`.
 
 ---
 

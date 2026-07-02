@@ -208,6 +208,23 @@ See `Docs/GitHub.md` for the full setup guide and workflow file.
 The workflow file lives at `.github/workflows/build.yml`.
 Actions run only on pushes to `main`. Develop on version branches.
 
+The workflow has two independent jobs: `build-macos` (AU + VST3, universal binary, verified
+locally too) and `build-windows` (VST3 only — AU is Apple-only). Treat them as two separate
+concerns, not one shared config:
+
+- `build-windows` uses `-G "Visual Studio 17 2022" -A x64`. That generator invokes MSBuild,
+  which finds the MSVC toolchain itself — no manual `vcvarsall`/dev-cmd activation step is
+  needed. (That step is only required if a workflow switches to Ninja/NMake and calls `cl.exe`
+  directly — don't switch generators without adding it back.)
+- There is **no local Windows toolchain in this workflow.** `lipo` and `auval` do not apply
+  to the Windows artifact — the only verification available is the `build-windows` job going
+  green and the VST3 `.vst3` artifact uploading (`actions/upload-artifact`). Confirm both
+  before considering any phase "Windows-complete."
+- Any Apple-only header or API (`Accelerate.h`, `CoreAudio`, etc.) reachable from shared
+  (non-`#if JUCE_MAC`-guarded) code breaks `build-windows` even though `build-macos` passes
+  clean. Since there's no local repro, a Windows-only compile failure can only be diagnosed
+  from the Actions log — push the fix and re-run rather than guessing blind.
+
 ---
 
 ## After Phase 2

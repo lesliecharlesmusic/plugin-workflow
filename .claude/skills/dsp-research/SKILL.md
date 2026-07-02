@@ -1,6 +1,6 @@
 ---
 name: dsp-research
-description: DSP Research Agent for audio plugin development. Load this skill for Phase 1 (Architecture and Research) — when researching DSP algorithms, writing the DSP Design Document, surveying reference plugins, deriving transfer functions, or planning the signal flow. Also load when verifying equations or research imported from Gemini or ChatGPT before they touch any code.
+description: DSP Research Agent for audio plugin development. Load this skill for Phase 1A (DSP Design) — when researching DSP algorithms, writing the DSP Design Document, surveying reference plugins, deriving transfer functions, or planning the signal flow. Also load when verifying equations or research imported from Gemini or ChatGPT before they touch any code.
 ---
 
 # DSP Research Agent
@@ -31,15 +31,18 @@ For each reference plugin listed in `Docs/PluginSpec.md § 2.7`:
 - What to avoid — with justification
 - Known open-source implementations or papers (if any)
 
-### 2. Transfer Functions
+### 2. Transfer Functions (High-Level)
 
 For each processing stage:
 - Derive the s-domain transfer function
-- Show the bilinear transform discretisation (with pre-warping if applicable)
-- State the difference equation in Direct Form I
 - Flag any nonlinearity that requires oversampling
 
 Use standard notation. Show all steps. Do not skip algebra.
+
+Stop here — the bilinear transform and Direct Form I difference equation are **not**
+produced in this phase. That's the pre-code gate, resolved engine-by-engine in
+`Docs/State/DSP_Implementation.md` at the start of Phase 4 (`dsp-implementation` skill).
+This phase is decisions only: what algorithm, why — not yet how to build it.
 
 ### 3. Signal Flow
 
@@ -69,12 +72,16 @@ Weigh each against the target user/workflow from `Docs/PluginSpec.md § 2.8`:
 ### 6. Recommended Implementation Strategy
 
 State the chosen approach with justification. This becomes the foundation for Phase 1B architecture.
+Include an explicit **Implementation Order** — which engine gets built first in Phase 4/5 and why
+(dependency order, riskiest-first, etc.). This is the list `dsp-implementation` walks through
+engine-by-engine when it produces `Docs/State/DSP_Implementation.md`.
 
 End with: `RECOMMENDED IMPLEMENTATION STRATEGY` heading and a clear, numbered summary.
 
 Once approved, write this document into `Docs/State/DSP_Design.md` (replace the placeholder
 content section by section — do not just append). This file becomes the living source of
-truth for DSP design throughout the project, including Phases 4, 5, and 9.
+truth for the DSP *decisions* behind the project. It does not track implementation status —
+that lives in `Docs/State/DSP_Implementation.md` once Phase 4 begins.
 
 ---
 
@@ -101,4 +108,4 @@ approved and current. Load `plugin-architecture` skill for Phase 1B — it will 
 `Docs/State/DSP_Design.md` and write into `Docs/State/Software_Architecture.md`.
 
 After this skill completes its work, append one line to `Docs/State/Changelog.md`:
-`[date] [Phase 1] DSP_Design: initial design approved — [one-line summary]`
+`[date] [Phase 1A] DSP_Design: initial design approved — [one-line summary]`

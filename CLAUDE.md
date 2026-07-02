@@ -23,6 +23,7 @@
 | macOS Target | [12.0] |
 | Xcode Version | [16.x] |
 | CPU Target | Universal Binary (arm64 + x86_64) |
+| Windows Target | [10 / 11, x64 — VST3 only, built via GitHub Actions, no local Windows toolchain] |
 
 ---
 
@@ -48,13 +49,14 @@ Claude reads this to know which skill to load and what each phase's gate conditi
 | Phase | Name | Skill to Load | Gate Before Starting |
 |---|---|---|---|
 | 0 | Project Setup | *(no skill — Section 6 below)* | Toolchain installed |
-| 1 | Architecture & Research | `dsp-research` | Phase 0 complete |
+| 1A | DSP Design | `dsp-research` | Phase 0 complete |
+| 1B | Software Architecture | `plugin-architecture` | DSP_Design.md approved |
 | 2 | CMake + JUCE Skeleton | `build-system` | DSP_Design.md + Software_Architecture.md exist |
 | 3 | Parameter Architecture | `plugin-architecture` | Phase 2 compiles, Build_Config.md current |
-| 4 | Core DSP Engine | `dsp-implementation` | Parameters.md exists and approved |
+| 4 | DSP Implementation | `dsp-implementation` | Parameters.md exists and approved |
 | 5 | Advanced DSP | `dsp-implementation` | Phase 4 DSP classes implemented + unit tested |
 | 6 | UI Design (HTML) | `plugin-ui` | Phase 5 DSP stable |
-| 7 | JUCE GUI | `plugin-ui` | HTML prototype approved in UI_Design.md |
+| 7 | UI Implementation | `plugin-ui` | HTML prototype approved in UI_Design.md |
 | 8 | Preset System | `plugin-architecture` | Phase 7 GUI complete |
 | 9 | Optimization | `plugin-optimization` | Presets.md current, unit tests passing |
 | 10 | QA & DAW Validation | `plugin-qa` | Golden reference tests passing (`dsp-testing`) |
@@ -63,6 +65,9 @@ Claude reads this to know which skill to load and what each phase's gate conditi
 
 **Testing (continuous, not a phase):** Load `dsp-testing` after any DSP file change, and mandatorily before Phase R.
 **Debugging (any phase):** Load `plugin-debugging`
+**Pre-code gates:** Phase 4 opens by producing and getting approval on `Docs/State/DSP_Implementation.md`
+(engine-by-engine build spec) before any DSP `.cpp` is generated. Phase 7 opens the same way with
+`Docs/State/UI_Implementation.md`. Neither is optional, regardless of plugin size — see § 8.
 
 ---
 
@@ -103,6 +108,10 @@ These apply in every phase, every file, every session:
 - After every Release build: `lipo -info` must show both `x86_64` and `arm64`
 - AU type: `kAudioUnitType_MusicEffect` (aumf) with `NEEDS_MIDI_INPUT TRUE`
 - `COPY_PLUGIN_AFTER_BUILD FALSE` — copy manually
+- Windows VST3 is built exclusively by GitHub Actions (see `Docs/GitHub.md` § 4) — there is
+  no local Windows toolchain in this workflow. `lipo`/`auval` do not apply there; success is
+  the `build-windows` job going green and the VST3 artifact uploading. Guard any Apple-only
+  header/API with `#if JUCE_MAC` before it can break that job.
 
 ### Code Generation
 - No TODO stubs — all functions fully implemented
@@ -113,6 +122,19 @@ These apply in every phase, every file, every session:
 ### Testing
 - Every DSP class gets a unit test before being considered complete (load `dsp-testing`)
 - Golden reference regression run before every release — failures must be explained, not silently overwritten
+
+### Numerical Precision
+- Accumulate long-running derived state (envelope followers, RMS/level integrators, gain-reduction history) in `double` — display/output stays `float`
+- Decide this per accumulator up front, not after a drift bug appears; symptom only shows after extended runtime, which makes it expensive to diagnose retroactively
+
+### State Ownership
+- The moment a second component (a meter strip, a tracker view, a secondary readout) needs a derived or smoothed value another component already computes, extract it into one shared function or shared engine-side state immediately — never let a second call site re-derive it
+- Duplicated derived-state math is the single most common recurring bug class in this workflow's history: each copy looks correct in isolation, then drifts out of sync with the others over time
+
+### Collaboration Protocol
+- Give the literal value + its symbol name, not a description — `kHeaderFontSize = 22px`, not "the header font." Lets the user self-serve constant changes without a round trip
+- Bug reports are most useful as a numbered list naming the exact screen/element/symptom — batch several before starting fixes, then do one verification pass across all of them rather than ping-ponging one at a time
+- When a requirement has more than one reasonable reading, state the interpretation and ask before implementing — cheaper than building the wrong one and redoing it
 
 ---
 
@@ -153,7 +175,7 @@ Run once. Check off each item.
 - [ ] `Docs/PluginSpec.md` fully completed
 - [ ] This `CLAUDE.md` fully filled in
 - [ ] All files in `Docs/State/` initialised (templates already in place)
-- [ ] Phase status updated to: Phase 1 / NOT STARTED
+- [ ] Phase status updated to: Phase 1A / NOT STARTED
 
 ---
 
@@ -171,6 +193,9 @@ QA self-inspection of file just generated:
 8. Automation edge cases at min/max parameter values?
 9. getRawParameterValue pointers cached in prepareToPlay?
 10. Editor destructor resets attachments before stopTimer/setLookAndFeel?
+11. GUI file changed? Screenshot-audit it against the locked prototype/last-approved state —
+    compiling and passing auval/pluginval catches none of: clipped labels, misaligned scales,
+    invisible hover states.
 
 Rate each: PASS / WARNING / FAIL
 Fix all FAILs before compiling.
@@ -180,17 +205,25 @@ Fix all FAILs before compiling.
 
 ## 8. State Document Protocol (Replaces Phase Handoffs)
 
-There are no per-phase handoff files. Instead, six living documents in `Docs/State/`
+There are no per-phase handoff files. Instead, eight living documents in `Docs/State/`
 each hold the CURRENT truth for one domain. Edit them in place. Never let two documents
 disagree about the same fact — if you find a contradiction, fix it immediately.
 
+DSP and UI each split into two documents on purpose: a Design doc (decisions — what and
+why, no code) and an Implementation doc (build spec — how, produced as a pre-code gate
+right before the corresponding code phase starts). Each fact has exactly one home — the
+Design doc never contains a difference equation or a component inventory; the
+Implementation doc never contains an algorithm choice.
+
 | Domain | File | Edited During |
 |---|---|---|
-| DSP design & signal flow | `Docs/State/DSP_Design.md` | Phase 1, 4, 5, 9 |
-| Class structure & threading | `Docs/State/Software_Architecture.md` | Phase 1, 2, 3, 8 |
+| DSP decisions — signal flow, algorithms | `Docs/State/DSP_Design.md` | Phase 1A |
+| DSP build spec — difference equations, class state | `Docs/State/DSP_Implementation.md` | Phase 4, 5 |
+| Class structure & threading | `Docs/State/Software_Architecture.md` | Phase 1B, 2, 3, 8 |
 | Parameter IDs & ranges | `Docs/State/Parameters.md` | Phase 3 (frozen after release) |
 | CMake & build state | `Docs/State/Build_Config.md` | Phase 2, 9, R |
-| Visual design & GUI state | `Docs/State/UI_Design.md` | Phase 6, 7 |
+| UI decisions — layout, colours, fonts | `Docs/State/UI_Design.md` | Phase 6 |
+| UI build spec — file order, component inventory | `Docs/State/UI_Implementation.md` | Phase 7 |
 | Preset architecture | `Docs/State/Presets.md` | Phase 8 |
 | History of WHY things changed | `Docs/State/Changelog.md` | Every phase — append only |
 
@@ -286,6 +319,10 @@ Full handoff templates: `Docs/CrossToolHandoff.md`
 - `AudioBuffer` stack allocation inside `processBlock` = heap allocation — pre-allocate as member
 - `HeapBlock` inside `processBlock` = heap allocation — pre-allocate as member
 - `ScopedNoDenormals` scope starts where declared — must be first line
+- `CallOutBox`/`ComboBox` open independent OS windows in an AU host (Logic) — they don't
+  track the plugin window moving, and JUCE's `MouseListener`/`ModalComponentManager`
+  dismissal paths don't fire because Logic's NSView eats the click first. See
+  `plugin-ui/SKILL.md` for the polling-based tracking/dismissal pattern that actually works.
 
 ---
 
@@ -323,11 +360,13 @@ Full handoff templates: `Docs/CrossToolHandoff.md`
 │   │   ├── inputs/
 │   │   └── expected/v[X.Y.Z]/
 │   └── State/                         ← LIVING docs, edited in place
-│       ├── DSP_Design.md
+│       ├── DSP_Design.md              ← decisions (Phase 1A)
+│       ├── DSP_Implementation.md      ← build spec (Phase 4/5 pre-code gate)
 │       ├── Software_Architecture.md
 │       ├── Parameters.md
 │       ├── Build_Config.md
-│       ├── UI_Design.md
+│       ├── UI_Design.md               ← decisions (Phase 6)
+│       ├── UI_Implementation.md       ← build spec (Phase 7 pre-code gate)
 │       ├── Presets.md
 │       └── Changelog.md               ← the ONLY append-only file
 └── .claude/
@@ -361,4 +400,4 @@ Full handoff templates: `Docs/CrossToolHandoff.md`
 
 ---
 
-*Last updated: [DATE] | Template v2.4*
+*Last updated: [DATE] | Template v2.6*

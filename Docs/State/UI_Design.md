@@ -1,7 +1,11 @@
 # UI Design — [PLUGIN NAME]
 
-> LIVING DOCUMENT. Reflects the CURRENT approved visual design and GUI implementation state.
-> Edit in place when design changes. History belongs in Changelog.md.
+> LIVING DOCUMENT. Reflects the CURRENT approved visual design. Edit in place when design
+> changes. History belongs in Changelog.md.
+> Decisions only — what and why: layout, colours, fonts, interactions, window dimensions.
+> Paired with the HTML prototype (Phase 6). The JUCE build spec (file order, component
+> inventory, constants, verification checklist) lives in `Docs/State/UI_Implementation.md`,
+> produced at the start of Phase 7.
 
 ---
 
@@ -16,35 +20,6 @@
   - Label:
 - **Control style:**
 - **HTML prototype approved:** Yes/No — date
-
----
-
-## LookAndFeel Implementation Status
-
-| Element | Status |
-|---|---|
-| Custom rotary knob | |
-| Custom button | |
-| Sync dot indicator | |
-| Colour constants | |
-
----
-
-## Component Inventory
-
-| Component | File | Status |
-|---|---|---|
-| PluginEditor | `Source/GUI/PluginEditor.h/.cpp` | |
-| LookAndFeel | `Source/GUI/LookAndFeel.h/.cpp` | |
-| LevelMeter | | |
-
----
-
-## Editor Destructor Checklist (verify every time editor changes)
-
-- [ ] All dynamic attachments reset first
-- [ ] `stopTimer()` second
-- [ ] `setLookAndFeel(nullptr)` last
 
 ---
 

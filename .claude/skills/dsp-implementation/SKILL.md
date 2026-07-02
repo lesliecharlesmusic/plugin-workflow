@@ -15,18 +15,33 @@ description: DSP Implementation Agent for audio plugin development. Load for Pha
 
 ---
 
-## Pre-Code Gate (Non-Negotiable)
+## Pre-Code Gate — Produce DSP_Implementation.md (Non-Negotiable)
 
-Before writing any DSP C++:
+Before writing any DSP C++, read `Docs/State/DSP_Design.md` and
+`Docs/State/Software_Architecture.md` — both must be approved and current. No algorithm
+exploration happens here; that already happened in `DSP_Design.md`. This gate is pure
+translation from decisions to a build spec.
 
-1. Show the transfer function equation for this stage
-2. Show the signal flow through this class in ASCII
-3. Show the bilinear transform and resulting difference equation
-4. Explain the parameter smoothing strategy
-5. Identify any nonlinearity requiring oversampling
+For every engine in `DSP_Design.md`'s Signal Flow / Implementation Order, produce:
 
-**User must explicitly approve the math before any code is generated.**
-If asked to skip this gate: refuse and explain why the gate exists.
+1. The bilinear transform and resulting difference equation (Direct Form I)
+2. Class members — what state this engine owns
+3. The `processBlock` integration point — where and how it's called
+4. The parameter smoothing wiring
+5. Any remaining open question for this engine — must be resolved, not deferred
+
+**User must explicitly approve each engine's build spec before any code is generated for
+that engine.** If asked to skip this gate: refuse and explain why it exists — skipping it
+reintroduces algorithm decisions into the C++ pass, which is exactly what causes
+mid-implementation rewrites.
+
+Once approved, write the build spec into `Docs/State/DSP_Implementation.md`, replacing
+placeholder content section by section — do not just append. Append one line to
+`Docs/State/Changelog.md`: `[date] [Phase 4] DSP_Implementation: build spec approved for
+[engine] — [one-line summary]`.
+
+Every class generated below must trace to an approved entry in `DSP_Implementation.md`.
+If an engine doesn't have one yet, produce it first rather than deriving the design inline.
 
 ---
 
@@ -77,6 +92,12 @@ private:
     int maxBlockSize_  = 512;
 };
 ```
+
+**Precision:** any long-running accumulator this class owns — envelope followers,
+RMS/level integrators, gain-reduction history — accumulates in `double`; only the
+final displayed/output value narrows to `float`. Decide this per accumulator now,
+not after a drift bug appears after extended runtime (see `CLAUDE.md § 4` Numerical
+Precision).
 
 ### processBlock Pattern
 
@@ -211,13 +232,13 @@ DSP-specific additions:
 ## After Each DSP Class Is Complete
 
 1. Load `dsp-testing` skill and write unit tests for the new class before moving on
-2. Update `Docs/State/DSP_Design.md` implementation status table for this stage
+2. Update `Docs/State/DSP_Implementation.md`'s Current Implementation Status table for this engine
 3. If architecture changed from the original plan, update `Docs/State/Software_Architecture.md` too
-4. Append to `Docs/State/Changelog.md`: `[date] [Phase 4/5] DSP_Design: [class] implemented and unit tested`
+4. Append to `Docs/State/Changelog.md`: `[date] [Phase 4/5] DSP_Implementation: [class] implemented and unit tested`
 
 ## After Phase 4 / Phase 5 Complete
 
 - Run the full unit test suite — all must pass
-- Update `Docs/State/DSP_Design.md` status table to "Implemented" for all stages
+- Update `Docs/State/DSP_Implementation.md` status table to "Implemented" for all engines
 - Update `CLAUDE.md § 2` current phase
 - Load next skill per the Phase Roadmap in `CLAUDE.md § 3`

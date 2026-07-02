@@ -1,11 +1,32 @@
 ---
 name: plugin-ui
-description: UI/UX Agent for audio plugin development. Load for Phase 6 (HTML prototype) and Phase 7 (JUCE GUI implementation — LookAndFeel, PluginEditor, custom components). Also load when drawing knobs, metering, spectrum displays, sync buttons, about screens, or any visual component. Do not load for DSP or CMake work.
+description: UI/UX Agent for audio plugin development. Load for Phase 6 (HTML prototype) and Phase 7 (UI Implementation — LookAndFeel, PluginEditor, custom components). Also load when drawing knobs, metering, spectrum displays, sync buttons, about screens, or any visual component. Do not load for DSP or CMake work.
 ---
 
 # UI/UX Agent
 
 **Role:** Visual designer and JUCE GUI engineer. Phases 6 and 7 are strictly separated — HTML approval gate must pass before any JUCE code is written.
+
+---
+
+## General Design Defaults (apply in both Phase 6 and 7 unless the spec overrides them)
+
+- **Typography:** strict 3-tier hierarchy — hero readout, secondary readout, label — and stop there; more tiers blur together. Medium weight reads better than regular on dark themes; reserve bold for data values. Pick a hard floor for body text size on the target background and test it on the actual target display, not just a high-DPI dev screen.
+- **Consistency across equivalent elements:** any set of conceptually-equivalent readouts (e.g. five meters that are "the same kind of thing") must share one font size/weight and one refresh rate — a mismatch reads as a bug even when each element is correct in isolation.
+- **Meters / data visualizations:** stacked colour zones (green/amber/red), not whole-element colour change — only the portion in each zone shows that zone's colour. Align reference lines (0 line, baseline) across all parallel meter/graph groups in the same panel. Never show a scale-based visual without printed markings. Any counter that can grow unbounded needs an explicit display ceiling so layout never breaks at high values.
+- **Window/panel behaviour:** a fixed, non-resizable window is the strong default — it trades flexibility for zero scaling bugs and pixel-perfect alignment, which matters more than resizing for most plugin UIs. Pop-out/auxiliary panels must never move or resize the main window when toggled. Minimal header (branding/status only) + footer toolbar (controls) keeps the eye on the content area.
+
+---
+
+## Screenshot-Audit Protocol (highest-value QA step for GUI work)
+
+Compiling and passing `auval`/`pluginval` tells you nothing about clipped labels, misaligned
+scales, or invisible hover states — only a screenshot does.
+
+- Screenshot-audit the HTML prototype before requesting Phase 6 approval
+- Screenshot-audit again after **every** page-level GUI change in Phase 7, not just at milestone gates
+- Fix, re-screenshot, repeat until clean
+- Once the prototype is locked and approved, treat it as the spec to diff the real JUCE implementation against
 
 ---
 
@@ -52,12 +73,36 @@ Before proceeding to Phase 7, confirm:
 - [ ] Knob aesthetic approved
 - [ ] About popup works
 - [ ] Overall feel matches sonic identity from spec § 2.2
+- [ ] Screenshot-audit passed clean (see Screenshot-Audit Protocol above)
 
 ---
 
-## Phase 7 — JUCE GUI Implementation
+## Phase 7 — UI Implementation (JUCE GUI)
 
 **Only begin after HTML prototype is explicitly approved.**
+
+### Step 0 — Produce UI_Implementation.md (gate before any JUCE code)
+
+Read `Docs/State/UI_Design.md` (must be approved) and the locked HTML prototype. No visual
+design decisions happen here — those already happened in `UI_Design.md` and the approved
+prototype; this is pure translation to a build spec.
+
+Confirm prerequisites: prototype approved, DSP stable (Phase 5 complete — parameters exist
+to attach to), fonts/images embedded in BinaryData. Produce:
+
+1. File-by-file implementation order
+2. Component inventory (component, target file, status)
+3. Colour/font constants — literal value + symbol name, pulled directly from the prototype
+4. Data flow diagram — what crosses the Processor↔Editor thread boundary and how
+5. Verification checklist (destructor order, screenshot-audit, HiDPI, etc.)
+
+**User must explicitly approve this document before any JUCE file is generated.** If asked
+to skip this gate: refuse and explain why it exists — the same reasoning as the DSP
+pre-code gate (`dsp-implementation/SKILL.md`) applies here.
+
+Once approved, write it into `Docs/State/UI_Implementation.md`, replacing placeholder
+content section by section. Append one line to `Docs/State/Changelog.md`:
+`[date] [Phase 7] UI_Implementation: build spec approved`.
 
 Generate files in this order. One file per response.
 
@@ -191,6 +236,48 @@ Do not drive meter updates from the audio thread.
 
 ---
 
+## Floating Popups in AU/VST3 Hosts (CallOutBox, ComboBox)
+
+`juce::CallOutBox::launchAsynchronously(content, area, nullptr)` and `juce::ComboBox` both
+create independent top-level OS windows (NSWindow on macOS). In an AU host (Logic Pro) this
+causes three specific failures:
+
+- **They do not track the plugin window.** When the host moves the plugin, the popup stays
+  at its original screen position.
+- **Clicks inside the plugin do not dismiss them via JUCE's modal manager.** Logic embeds
+  the plugin editor in its own NSView and handles the click before JUCE sees it — both
+  `MouseListener` and `ModalComponentManager` dismissal paths fail silently.
+- **`ComponentListener::componentMovedOrResized` also fails** for detecting host-window
+  movement — the plugin component's local bounds don't change when Logic's window moves,
+  only its screen coordinates do.
+
+**Reliable patterns:**
+
+1. *Tracking movement:* poll `parent->getScreenPosition()` at 60 Hz (piggyback on an existing
+   timer), compute the delta, and call `CallOutBox::updatePosition()` to move the callout's
+   underlying NSWindow. This is the only path that works across hosts.
+2. *Dismissing a CallOutBox on click inside the plugin:* poll `box->getPeer()->isFocused()`.
+   Clicking inside the plugin hands OS focus back to Logic's NSWindow, so the callout's peer
+   losing focus is the dismiss signal. Add a ~5-frame grace period after launch so the
+   callout has time to acquire focus before monitoring starts.
+3. *Dismissing ComboBox dropdowns on window move:* there is no public API to reposition a
+   showing `PopupMenu` — the only option is dismissal. Call
+   `juce::PopupMenu::dismissAllActiveMenus()` in the editor's 60 Hz timer whenever
+   `getScreenPosition()` changes. One check in one place covers every ComboBox in the plugin.
+
+**Implementation pattern — self-managing watcher:** allocate the watcher with `new` (no
+owner); it self-deletes via `MessageManager::callAsync` once the watched `CallOutBox` is
+gone. Use `juce::Component::SafePointer<CallOutBox>` to detect deletion safely without a
+dangling pointer, and implement `ComponentListener::componentBeingDeleted` to handle the
+parent being torn down.
+
+**What does NOT work in an AU host:** `ComponentListener::componentMovedOrResized` for
+host-window movement; `MouseListener` with `wantChildEvents = true` for detecting clicks
+inside the plugin; `getTopLevelComponent()` as the CallOutBox parent (changes visual style —
+constrains bounds, different arrow behaviour — and was rejected).
+
+---
+
 ## Verification (after every file)
 
 See `CLAUDE.md § 7`.
@@ -201,3 +288,18 @@ UI-specific checks:
 - [ ] No timer started in constructor without corresponding `stopTimer()` in destructor
 - [ ] No raw pointer to Processor stored in Editor without lifetime consideration
 - [ ] BinaryData namespace matches the unique one set in CMakeLists.txt
+- [ ] Any `CallOutBox`/`ComboBox` tested against host-window movement and click-inside-plugin dismissal in Logic
+- [ ] Screenshot-audit taken and clean (see Screenshot-Audit Protocol above)
+
+---
+
+## After Each GUI File Is Complete
+
+1. Update `Docs/State/UI_Implementation.md`'s Component Inventory status for this component
+2. Append to `Docs/State/Changelog.md`: `[date] [Phase 7] UI_Implementation: [component] implemented`
+
+## After Phase 7 Complete
+
+- Update `Docs/State/UI_Implementation.md` status table to "Implemented" for all components
+- Update `CLAUDE.md § 2` current phase
+- Load next skill per the Phase Roadmap in `CLAUDE.md § 3`
