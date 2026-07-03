@@ -11,6 +11,7 @@
 |---|---|
 | Plugin Name | [PLUGIN NAME] |
 | Manufacturer | [MANUFACTURER NAME] |
+| Author / Developer (if different from Manufacturer) | [used for About-screen credit] |
 | Manufacturer Code | [4-CHAR e.g. LCSC] |
 | Plugin Code | [4-CHAR e.g. PLGB] |
 | Version | [e.g. 1.0.0] |
@@ -19,7 +20,9 @@
 | JUCE Path | [/Users/you/DEV/JUCE] |
 | JUCE Version | [8.0.12] |
 | Project Root | [/Users/you/DEV/PluginName] |
-| Build Output | [/Users/you/DEV/PluginName/Build] |
+| Build Output | [/Users/you/DEV/PluginName/Build — same root as Project Root by default; confirmed at start of Phase 2] |
+| AU Install Path | [~/Library/Audio/Plug-Ins/Components/] |
+| VST3 Install Path | [~/Library/Audio/Plug-Ins/VST3/] |
 | macOS Target | [12.0] |
 | Xcode Version | [16.x] |
 | CPU Target | Universal Binary (arm64 + x86_64) |
@@ -108,6 +111,10 @@ These apply in every phase, every file, every session:
 - After every Release build: `lipo -info` must show both `x86_64` and `arm64`
 - AU type: `kAudioUnitType_MusicEffect` (aumf) with `NEEDS_MIDI_INPUT TRUE`
 - `COPY_PLUGIN_AFTER_BUILD FALSE` — copy manually
+- After every successful build: run the Post-Build Install Ritual (`build-system/SKILL.md`)
+  — copy AU/VST3 to the paths in § 1, asking explicit permission before overwriting an
+  existing install of the same plugin, then clear the AU caches and run `auval`. Every
+  build, not just when troubleshooting a stale-cache bug.
 - Windows VST3 is built exclusively by GitHub Actions (see `Docs/GitHub.md` § 4) — there is
   no local Windows toolchain in this workflow. `lipo`/`auval` do not apply there; success is
   the `build-windows` job going green and the VST3 artifact uploading. Guard any Apple-only
@@ -400,4 +407,4 @@ Full handoff templates: `Docs/CrossToolHandoff.md`
 
 ---
 
-*Last updated: [DATE] | Template v2.6*
+*Last updated: [DATE] | Template v2.7*

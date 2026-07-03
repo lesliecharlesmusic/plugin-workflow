@@ -7,16 +7,9 @@
 
 ## 2.1 Project Identity
 
-| Field | Value |
-|---|---|
-| Plugin Name | |
-| Version Number | |
-| Manufacturer Name | |
-| Manufacturer Code | (4-char, e.g. LCSC) |
-| Plugin Code | (4-char, e.g. PLGB) |
-| Plugin Category | |
-| Plugin Formats | AU + VST3 |
-| Author / Developer | |
+> Filled in `CLAUDE.md § 1` instead — plugin name, version, manufacturer, codes, category,
+> formats, and author/developer credit all live there. Keeping one copy avoids the two
+> documents drifting out of sync on the same fact.
 
 ---
 
@@ -141,16 +134,9 @@ For each control: Name | Range | Default | What it does to the sound
 
 ## 2.6 Technical Requirements
 
-| Field | Value |
-|---|---|
-| JUCE Path | |
-| Project Output Path | |
-| JUCE Version | |
-| Xcode Version | |
-| macOS Target | e.g. 12.0 Monterey |
-| Windows Target | (leave blank if macOS only) |
-| CPU Target | Universal Binary (arm64 + x86_64) |
-| Preset System | User presets / Factory presets / Both / None |
+> Filled in `CLAUDE.md § 1` instead — JUCE path/version, Xcode version, macOS/Windows/CPU
+> targets, and project paths all live there. Preset System choice lives in
+> `CLAUDE.md § 5` (quick reference) and `Docs/State/Presets.md` (full detail, Phase 8).
 
 ---
 

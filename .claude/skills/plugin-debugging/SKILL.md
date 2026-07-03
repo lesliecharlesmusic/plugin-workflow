@@ -118,6 +118,9 @@ sudo killall -9 AudioComponentRegistrar 2>/dev/null
 # Fully quit Logic (Cmd+Q) and relaunch
 ```
 **Fingerprint:** `auval` passes + host disagrees = cache problem, not a code problem.
+This is the escalated fix (deletes the installed component too) for when the routine
+cache-clear in `build-system/SKILL.md`'s Post-Build Install Ritual — which runs after
+every successful build, not just when something's stuck — wasn't enough on its own.
 
 **`auval` error: "MusicEffect requires MIDI input"**
 - `NEEDS_MIDI_INPUT` not set to `TRUE` in `CMakeLists.txt` for aumf type

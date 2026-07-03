@@ -15,6 +15,15 @@ description: Build System Agent for audio plugin development. Load for Phase 2 �
 
 Read `CLAUDE.md § 1` for all project identity fields before generating anything.
 
+### Step 0: Confirm the Build Output location
+
+Default assumption: `Source/` and the `Build/` directory live in the same project root —
+`Build Output` in `CLAUDE.md § 1` is `[Project Root]/Build`, a sibling of `Source/`, not a
+separate location. Before generating `CMakeLists.txt`, ask the user explicitly whether
+they want this changed (e.g. build artifacts redirected to a separate drive or RAM disk
+for speed). If they confirm the default, proceed. If they want it changed, update
+`Build Output` in `CLAUDE.md § 1` to the new path before continuing.
+
 ### Step 1: Generate CMakeLists.txt
 
 Generate ONLY `CMakeLists.txt` first. Nothing else.
@@ -129,9 +138,8 @@ Do not deviate from this order.
 11. xcodebuild -scheme [NAME]_AU -configuration Release build
 12. lipo -info Build/[path]/[NAME].component/Contents/MacOS/[NAME]
     → must show: x86_64 arm64
-13. cp -R to ~/Library/Audio/Plug-Ins/Components/
-14. Load in Logic / AudioPluginHost
-15. auval -v aumf [PLUG] [MFR]        ← zero failures
+13. Run the Post-Build Install Ritual (below) — copies AU/VST3, clears AU cache, runs auval
+14. Load in Logic / AudioPluginHost to confirm it appears and opens cleanly
 ```
 
 **GATE 1** (before cmake configure): All paths in `target_sources()` must exist on disk.
@@ -199,6 +207,36 @@ lipo -info /path/to/[PLUGIN].component/Contents/MacOS/[PLUGIN]
 # 1. Stale Build/ folder → rm -rf Build/ → reconfigure → rebuild
 # 2. cp -R merged rather than replaced → rm -rf destination → cp -R again
 ```
+
+---
+
+### Post-Build Install Ritual (run after every successful build)
+
+Every successful build ends here — not just Phase 2's initial skeleton. This is the only
+path artifacts should reach the install directories; it's why `COPY_PLUGIN_AFTER_BUILD` is
+left `FALSE` in CMake (see the config above) — manual copy keeps architecture and
+overwrite behavior under control instead of Xcode silently doing it.
+
+1. Read `AU Install Path` and `VST3 Install Path` from `CLAUDE.md § 1`.
+2. If a plugin of the same name already exists at either destination, **stop and ask the
+   user for explicit permission before overwriting it** — never replace an existing
+   install silently.
+3. Copy the fresh artifacts:
+   ```bash
+   cp -R Build/[path]/[NAME].component "[AU Install Path]/[NAME].component"
+   cp -R Build/[path]/[NAME].vst3 "[VST3 Install Path]/[NAME].vst3"
+   ```
+4. Clear the AU caches so the host can't load a stale cached verdict for the build that
+   just changed — do this every time, not only when chasing a stuck-cache bug:
+   ```bash
+   rm -rf ~/Library/Caches/AudioUnitCache
+   rm -rf ~/Library/Caches/com.apple.audio.InfoHelper
+   rm -rf ~/Library/Caches/com.apple.audio.AudioComponentRegistrar 2>/dev/null
+   sudo killall -9 AudioComponentRegistrar 2>/dev/null
+   ```
+5. Run `auval -v aumf [PLUGIN_CODE] [MANUFACTURER_CODE]` — zero failures required before
+   the build counts as verified. (`auval` covers AU only; there's no Apple equivalent for
+   VST3 — `pluginval` is the manual fallback there, per the Phase 0 checklist.)
 
 ---
 
