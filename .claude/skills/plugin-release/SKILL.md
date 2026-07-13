@@ -15,6 +15,9 @@ description: Release Agent for audio plugin development. Load after Phase 10 QA 
 
 Before building the release binary:
 
+- [ ] `Source/Core/DevPhaseLabel.h` deleted and every reference to it removed from
+  `PluginEditor` (the corner phase overlay, `CLAUDE.md § 4` Debug Instrumentation) —
+  actually gone, not just hidden behind a flag
 - [ ] Version number matches in ALL locations:
   - `CMakeLists.txt` (`project VERSION` and JUCE `VERSION`)
   - `PluginProcessor` (version constant)

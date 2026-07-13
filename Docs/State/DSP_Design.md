@@ -21,6 +21,34 @@
 
 ---
 
+## Competitive Landscape
+
+*(Research Round 2 — professional plugins beyond the references above, sourced via web
+search, not training-data recall)*
+
+### [Competitor Name]
+- **Sonic behaviour / feature set vs our planned approach:**
+- **Documented criticism / feedback:**
+- **Does our approach already address this gap, or should it adjust:**
+
+*(repeat per competitor — no cap on how many)*
+
+---
+
+## Frontier Techniques Considered
+
+*(Research Round 3 — DSP techniques/algorithms/papers not yet widely adopted in
+commercial plugins, anchored to credible sources: DAFx, JAES, arXiv audio/DSP)*
+
+### Safe to Adopt Now
+*(Sound theoretical grounding, feasible in real time, clear fit for this plugin)*
+
+### Experimental / Risky
+*(Interesting but unproven — CPU cost, stability, or DSP soundness uncertain.
+User chooses whether to pursue any of these.)*
+
+---
+
 ## Transfer Functions (High-Level)
 
 ### Stage: [Name]

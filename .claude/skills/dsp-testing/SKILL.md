@@ -127,6 +127,15 @@ TEST_CASE("Biquad does not produce denormals from near-zero input", "[denormal]"
 }
 ```
 
+### Before "fixing" code to satisfy a failing test, re-derive the spec math
+
+A failing test is not automatically a code bug — a channel-count mixup or a backwards
+assertion in the *test itself* produces the same red output as a real regression. Before
+changing implementation code to make a test pass, re-derive what the spec actually says
+the correct answer is (e.g. BS.1770 loudness legitimately reads stereo content ~3dB
+louder than mono for identical per-channel content — that's correct behavior, not a bug,
+and "fixing" the code to match a wrong test expectation would introduce a real one).
+
 ### Running tests
 
 ```bash

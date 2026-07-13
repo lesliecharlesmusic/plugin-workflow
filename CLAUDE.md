@@ -98,11 +98,35 @@ These apply in every phase, every file, every session:
 - Call `getNextValue()` exactly once per sample
 - Filter cutoff: interpolate coefficients per-block via SmoothedValue on the frequency
 
+### Discontinuity Prevention
+- Every toggle that touches the audio or detector path gets a crossfade (`SmoothedValue`,
+  ~20ms default), never a hard branch — `bool ? pathA : pathB` clicks on every flip, no
+  exceptions, even for toggles that don't feel "obviously audible"
+- Click-free protection belongs to the *value*, not to whichever one trigger you built it
+  for — the moment a value gets crossfade protection for reason A (a preset load, a
+  snapshot recall), audit every OTHER path that can change the same value (its own
+  knob/button, host automation, MIDI Learn) and confirm each is independently safe, don't
+  assume the first fix covers all of them
+- `prepareToPlay()` can legitimately be called again mid-session by the host at an
+  unchanged sample rate (a documented AU/VST3 behavior) — guard every side effect inside
+  it (coefficient resets, forced `SmoothedValue` snaps-to-target, forced "changed" host
+  notifications) against this redundant-call case with one guard at the top
+  (`lastSampleRate_`/`everPrepared_`), not a bespoke check per side effect discovered one
+  bug report at a time
+- Never send a host a "value changed" notification (`setLatencySamples`, bus layout, etc.)
+  unless the value actually changed from what was last reported — a redundant notification
+  can trigger a full plugin-delay-compensation realignment and produce an audible click
+
 ### GUI Thread Safety
 - Editor destructor resets all dynamic `SliderParameterAttachment` objects **FIRST**
 - Destructor order: (1) reset all attachments → (2) `stopTimer()` → (3) `setLookAndFeel(nullptr)`
 - All preset load/save on message thread only
 - All APVTS `copyState`/`replaceState` on message thread only
+- Structural GUI reactions (a mode switch swapping which control is live, a bypass toggle
+  greying out a column) poll via a message-thread `Timer` (~15Hz), never an
+  `AudioProcessorValueTreeState::Listener` callback — that callback can fire from the audio
+  thread during host automation, and these reactions typically allocate (rebuilding
+  attachments, `setEnabled()` trees), which is unsafe off the message thread
 
 ### Build Rules
 - Generate ONE file per response — explain it, wait for approval, then next file
@@ -142,6 +166,21 @@ These apply in every phase, every file, every session:
 - Give the literal value + its symbol name, not a description — `kHeaderFontSize = 22px`, not "the header font." Lets the user self-serve constant changes without a round trip
 - Bug reports are most useful as a numbered list naming the exact screen/element/symptom — batch several before starting fixes, then do one verification pass across all of them rather than ping-ponging one at a time
 - When a requirement has more than one reasonable reading, state the interpretation and ask before implementing — cheaper than building the wrong one and redoing it
+
+### Debug Instrumentation
+- `Source/Core/DevPhaseLabel.h` holds one string constant naming the current phase (e.g.
+  `"Phase 4 — DSP Implementation"`, matching the Name column in `CLAUDE.md § 3`). Created
+  in Phase 2, drawn as a small, unobtrusive corner overlay in `PluginEditor` from Phase 2
+  onward — this is how you confirm which phase's build you're actually looking at when
+  testing in a host
+- Update that constant every time `CLAUDE.md § 2`'s current phase changes — a one-line
+  edit, not a GUI change, so it doesn't drag DSP-only or preset-only phases into touching
+  editor code
+- This overlay is **not** part of the approved visual design — it must never appear in
+  the Phase 6 HTML prototype, and the Phase 7 screenshot-audit disregards it when diffing
+  against the locked design
+- Mandatory removal gate: `plugin-release` deletes the overlay code and
+  `DevPhaseLabel.h` entirely before any release build — not a flag to flip, actually gone
 
 ---
 
@@ -258,9 +297,14 @@ Identify:
 2. Architectural drift from Docs/PluginSpec.md
 3. Naming inconsistencies across files
 4. Thread safety risks not yet addressed
-5. Recommended corrections before continuing
+5. Any value multiple documents *assume* exists (referenced as if obviously specified)
+   but was never actually assigned an ID/range/default in the real source-of-truth table
+6. Recommended corrections before continuing
 Recommendations only — no code.
 ```
+Do this periodically even when nothing feels wrong — at least one living document *will*
+quietly stop being updated at some point while the others move on, and it's cheaper to
+catch that with a scheduled pass than to discover it by contradiction later.
 
 ---
 
@@ -330,6 +374,21 @@ Full handoff templates: `Docs/CrossToolHandoff.md`
   track the plugin window moving, and JUCE's `MouseListener`/`ModalComponentManager`
   dismissal paths don't fire because Logic's NSView eats the click first. See
   `plugin-ui/SKILL.md` for the polling-based tracking/dismissal pattern that actually works.
+- `SliderParameterAttachment`'s constructor silently calls
+  `setDoubleClickReturnValue(true, defaultValue)` on every `Slider` it binds — if you build
+  your own double-click behavior (e.g. a type-in-value tooltip), call
+  `slider.setDoubleClickReturnValue(false, 0.0)` immediately after construction, and again
+  every time the attachment is rebuilt (a fresh attachment re-enables it). Symptom: a value
+  reset to exactly the parameter's default on a perfectly stationary double-click.
+- `processBlockBypassed()` defaults to asserting bypass reports the same latency as normal
+  processing — override it explicitly the moment any feature makes `getLatencySamples()`
+  nonzero, routing it through the same delayed/muted path a soft bypass already uses
+- A `Rectangle` read (e.g. `getX()`) *after* `removeFromLeft()`/`removeFromTop()`/etc. have
+  already mutated it returns a position from the wrong sub-region — capture any position
+  needed downstream before further mutation, not by re-querying the mutated object later
+- A `juce::Timer`-derived class owns exactly one interval — if it already drives job A via
+  its inherited `Timer`, compose a second, separate object with its own internal `Timer`
+  for unrelated job B rather than multiplexing both onto one `timerCallback()`
 
 ---
 
@@ -343,6 +402,7 @@ Full handoff templates: `Docs/CrossToolHandoff.md`
 ├── .gitignore
 ├── Source/
 │   ├── Core/
+│   │   └── DevPhaseLabel.h    ← temporary, deleted before release (§ 4 Debug Instrumentation)
 │   ├── DSP/
 │   ├── Parameters/
 │   │   ├── ParameterIDs.h
@@ -407,4 +467,4 @@ Full handoff templates: `Docs/CrossToolHandoff.md`
 
 ---
 
-*Last updated: [DATE] | Template v2.7*
+*Last updated: [DATE] | Template v2.9*

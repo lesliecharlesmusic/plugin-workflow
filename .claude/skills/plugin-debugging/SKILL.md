@@ -72,7 +72,47 @@ Then:
 - APVTS `replaceState()` called on audio thread
 - Fix: always call `replaceState` on message thread via `juce::MessageManager::callAsync`
 
+### State / Dispatch Logic Bugs
+
+**A button/flag gets "stuck" or an action silently never fires, only sometimes**
+- Look for `if (A) ... else if (B) ...` where A and B are driven by independently
+  triggerable real-world events (a timer completing vs. a user click, two separate
+  parameters, two separate hardware/host events) that were assumed mutually exclusive but
+  aren't — both landing in the same audio block means the `else if` branch never runs,
+  silently dropping whatever it was responsible for (a message-thread dispatch, a UI reset)
+- Fix: check the higher-priority event first and unconditionally, explicitly
+  discarding/consuming the lower-priority event's pending state rather than letting
+  program order accidentally decide it
+
 ### Audio Artifacts
+
+**Click on the very first parameter gesture of a session, reproduces only in a real host**
+**(Logic/REAPER), never in Standalone**
+- Two distinct causes produce this exact signature — check both before assuming DSP math:
+  1. `prepareToPlay()` was called again by the host at an unchanged sample rate (a
+     documented, legitimate AU/VST3 host behavior, sometimes tied to the plugin's UI
+     becoming active) and something inside it unconditionally reset a `SmoothedValue` to
+     its target or re-sent a "latency changed" host notification — see Discontinuity
+     Prevention in `CLAUDE.md § 4`
+  2. **Code signing, not DSP.** An ad-hoc-signed Debug binary can get rejected by `amfid`
+     (Apple's file-integrity daemon) the moment a sandboxed host loads the plugin
+     out-of-process (Logic hosts AU this way; REAPER doesn't, which is exactly why it
+     never reproduces there). This produces a click/dropout that looks identical to a
+     DSP/parameter-timing bug from the reproduction pattern alone. Pull the actual system
+     log for the reproduction window before spending another pass reading source code:
+     `log show --last 5m --predicate 'process == "Logic Pro"'` (or the relevant host) and
+     look for `AppleMobileFileIntegrityError` / `AUHostingServiceXPC` teardown entries.
+     If found: this project has no Developer ID certificate configured yet — see
+     `plugin-release/SKILL.md` Code Signing.
+- **Diagnostic tooling note:** prefer `log show --last <duration>` over `log stream`
+  redirected to a file for after-the-fact captures — piping `log stream`'s output to a
+  file can silently capture nothing, since stdout not being a terminal switches many CLI
+  tools to block-buffered output that a `Ctrl-C`/`SIGINT` doesn't guarantee gets flushed.
+  `log show` is a single retroactive query against the OS's rolling log buffer instead, so
+  there's no buffering/interrupt timing to get wrong — reproduce the bug first, then run
+  the query. Also: on some machines `log` resolves to a zsh builtin, not `/usr/bin/log` —
+  a "too many arguments" error from an otherwise correctly-quoted `log show` command is
+  that builtin intercepting the call; invoke `/usr/bin/log` explicitly to bypass it.
 
 **Clicks / pops on parameter automation**
 - Parameter not smoothed with `SmoothedValue`

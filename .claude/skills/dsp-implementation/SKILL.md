@@ -168,7 +168,20 @@ Generate `Source/DSP/OversamplingManager.h`:
 - `processupsample(buffer)` → returns `AudioBlock` at oversampled rate
 - `processDownsample()` → writes back to original buffer
 - Reports latency: `oversampler.getLatencyInSamples()` → `setLatencySamples()`
-- No click on factor change: mute for one block, reset, resume
+- Factor change (discrete, not continuous) uses mute-reset-unmute, not a parallel-instance
+  crossfade: ramp to silence, swap/reset the oversampler at the silent instant, ramp back
+  up. Cheaper than an expensive parallel crossfade and sounds identical for anything that
+  isn't automated at audio rate — which a discrete topology switch like this never is.
+- The moment `getLatencySamples()` is nonzero because of this, override
+  `processBlockBypassed()` explicitly (see `CLAUDE.md § 12`) — its JUCE default asserts
+  bypass reports the same latency as normal processing
+- **Don't double-count latency:** if another subsystem also adds delay (an intentional
+  look-ahead pre-delay, for example), audit exactly which path picks up which delay from
+  where — on paper — before wiring dry-path compensation. It's easy to explicitly
+  compensate the dry path for both delays while the wet path picks up the oversampling
+  filter's own round-trip latency for free from the subsystem itself, leaving the wet path
+  delayed by less than the dry path assumes. That shows up as comb-filtering/phasing that's
+  easy to mistake for something unrelated.
 
 ### 5B: IR Loader (if applicable)
 
@@ -199,11 +212,40 @@ Both options are acceptable. `ScopedNoDenormals` is preferred when it covers all
 
 ---
 
+## Measurement / Detector Classes
+
+Any windowed or gated measurement (an N-second loudness integration, an envelope that
+needs to fill before it means anything) must expose an explicit `isReady()`/
+`hasValidReading()` query — don't let callers infer "not ready yet" from the value still
+sitting at its initial floor/default. A caller that finalizes or acts on the measurement
+(not just displays it) has no way to tell "genuinely measured this and it's quiet" apart
+from "never measured anything," and treating a floor-vs-floor delta as a real result is
+numerically valid but semantically meaningless.
+
+---
+
 ## prepareToPlay Checklist
+
+`prepareToPlay()` can legitimately be called again mid-session by the host at an unchanged
+sample rate (a documented AU/VST3 behavior, sometimes tied to the plugin's UI becoming
+active) — guard the whole function against this redundant-call case with one check at the
+top, not a bespoke guard per side effect discovered one bug report at a time. A redundant
+call that isn't guarded can snap in-progress `SmoothedValue` ramps to target (audible
+click if it lands mid-drag) or re-send a "latency changed" host notification that wasn't
+needed (see `CLAUDE.md § 4` Discontinuity Prevention).
 
 ```cpp
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    const bool isRedundantCall = everPrepared_
+        && sampleRate == lastSampleRate_
+        && samplesPerBlock == lastBlockSize_;
+    if (isRedundantCall)
+        return;   // nothing below should re-run for a same-rate re-prepare
+    everPrepared_ = true;
+    lastSampleRate_ = sampleRate;
+    lastBlockSize_ = samplesPerBlock;
+
     // 1. Cache sample rate and block size
     // 2. Cache ALL getRawParameterValue() pointers
     // 3. Resize/initialise all pre-allocated buffers

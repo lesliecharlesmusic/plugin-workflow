@@ -130,20 +130,48 @@ Do not deviate from this order.
 3. Create placeholder asset (Assets/placeholder.wav — 1-sample silent WAV)
 4. cmake -B Build -G Xcode            ← configure only, zero errors expected
 5. Write DenormalPrevention.h         ← header-only utility
-6. Write ParameterIDs.h               ← load plugin-architecture skill
-7. Write ParameterLayout.h/.cpp       ← load plugin-architecture skill
-8. Write PluginProcessor.h then .cpp  ← real content
-9. Write PluginEditor.h then .cpp     ← real content
-10. xcodebuild -scheme [NAME]_AU -configuration Debug build
-11. xcodebuild -scheme [NAME]_AU -configuration Release build
-12. lipo -info Build/[path]/[NAME].component/Contents/MacOS/[NAME]
+6. Write Source/Core/DevPhaseLabel.h  ← one string constant naming current phase (§ 4 Debug Instrumentation)
+7. Write ParameterIDs.h               ← load plugin-architecture skill
+8. Write ParameterLayout.h/.cpp       ← load plugin-architecture skill
+9. Write PluginProcessor.h then .cpp  ← real content
+10. Write PluginEditor.h then .cpp    ← real content, draws the DevPhaseLabel overlay
+11. xcodebuild -scheme [NAME]_AU -configuration Debug build
+12. xcodebuild -scheme [NAME]_AU -configuration Release build
+13. lipo -info Build/[path]/[NAME].component/Contents/MacOS/[NAME]
     → must show: x86_64 arm64
-13. Run the Post-Build Install Ritual (below) — copies AU/VST3, clears AU cache, runs auval
-14. Load in Logic / AudioPluginHost to confirm it appears and opens cleanly
+14. Run the Post-Build Install Ritual (below) — copies AU/VST3, clears AU cache, runs auval
+15. Load in Logic / AudioPluginHost to confirm it appears and opens cleanly
 ```
 
 **GATE 1** (before cmake configure): All paths in `target_sources()` must exist on disk.
 **GATE 2** (before xcodebuild): All `.cpp` files must have real, compilable content.
+
+---
+
+### DevPhaseLabel — temporary phase overlay (mandatory from Phase 2)
+
+`Source/Core/DevPhaseLabel.h` — one constant, updated every time the phase changes:
+```cpp
+#pragma once
+namespace DevPhaseLabel {
+    constexpr const char* kCurrentPhase = "Phase 2 — CMake + JUCE Skeleton";
+}
+```
+
+In `PluginEditor`'s `paint()`, draw it small and out of the way — bottom-left corner,
+low-contrast, never on top of a real control:
+```cpp
+g.setColour(juce::Colours::grey.withAlpha(0.5f));
+g.setFont(juce::FontOptions(11.0f));
+g.drawText(DevPhaseLabel::kCurrentPhase,
+           getLocalBounds().removeFromBottom(16).reduced(4, 0),
+           juce::Justification::centredLeft);
+```
+
+This is dev-only instrumentation, not part of the approved design — it must never appear
+in the Phase 6 HTML prototype, and the Phase 7 screenshot-audit disregards it. See
+`CLAUDE.md § 4` Debug Instrumentation. `plugin-release` deletes this file and the overlay
+code entirely before any release build.
 
 ---
 

@@ -41,12 +41,25 @@ processBlock()    ←——→   Editor / APVTS listeners
 DSP classes               PresetManager
 SmoothedValues            LookAndFeel
 ```
+- Standard cross-thread pattern, default to this shape for every "audio thread detected
+  something, message thread/GUI/host needs to react" case rather than inventing a new
+  mechanism per feature: **audio thread sets a plain atomic/flag → a small class derived
+  from `juce::AsyncUpdater` does the actual work (host notification, GUI update) on the
+  message thread when triggered.**
+- Any `Timer` driving logic that must keep running when the editor is closed (anything
+  that reacts to host automation, not just a GUI click) belongs on the `AudioProcessor`
+  itself — a private, always-running `juce::Timer` from construction — never inside a GUI
+  component's own `Timer`, which stops the moment the editor closes
 
 **5. APVTS Layout Plan**
 - Parameter ID naming convention
 - Smoothing assignments per parameter
 - How listeners attach (Editor vs Processor)
 - Attachment lifetime and ownership
+- `juce::UndoManager` ownership — who constructs it (owned by the Processor, passed into
+  the APVTS constructor), and confirm scope: it tracks user-initiated changes (GUI
+  gestures, preset loads), not host automation playback — undoing automation doesn't
+  make sense and isn't in scope
 
 **6. Ownership & Memory Model**
 - Who owns what (unique_ptr vs raw)
@@ -94,11 +107,19 @@ Generate ONLY `Source/Parameters/ParameterIDs.h`:
 - Include a version sentinel: `constexpr int kParamLayoutVersion = 1;`
 
 After generating, explain:
-1. Why IDs must never change after first release (breaks saved sessions and presets)
+1. Why IDs must never change after first release (breaks saved sessions and presets) —
+   and why that's true the moment ANY save file exists on disk, even pre-release: a
+   renamed/reassigned/renumbered ID silently orphans or corrupts anything already saved
+   with the old ID, including the developer's own test presets and sessions
 2. How IDs connect to APVTS `createParameterLayout()`
 3. The chosen naming convention and why
 
 Wait for approval. Then generate `ParameterLayout.h/.cpp` only after ID approval.
+
+**Undo/Redo:** every plugin gets `juce::UndoManager` wired into the APVTS constructor
+(`apvts_(*this, &undoManager_, "PARAMETERS", createParameterLayout())`) by default — see
+Threading Model § 5 above for ownership and scope. `plugin-ui` wires the keyboard
+shortcuts (Cmd+Z / Cmd+Shift+Z) once the editor exists.
 
 Once approved, write the full parameter table into `Docs/State/Parameters.md`
 (this becomes the frozen-after-release source of truth). Append to
@@ -129,6 +150,12 @@ Generate ONLY `Source/Presets/PresetManager.h` first, then `.cpp`.
 - File I/O on message thread only — assert or `jassert` if called on audio thread
 - `APVTS::copyState()` / `replaceState()` on message thread only
 - Preset recall glitch-free: load into temp state, then `replaceState` atomically
+- Save/Load buttons in the plugin's own GUI always open the native OS file browser
+  (`juce::FileChooser`), not a plugin-internal-only file list — gives the user full
+  filesystem access rather than being locked into one folder. This is scoped to the
+  plugin's own preset files; it's separate from and doesn't affect
+  `getStateInformation`/`setStateInformation`, which the host drives automatically for its
+  own session save/recall
 
 Before generating:
 1. Propose 6–10 factory preset names appropriate to the plugin category and sonic identity

@@ -13,8 +13,15 @@ description: UI/UX Agent for audio plugin development. Load for Phase 6 (HTML pr
 
 - **Typography:** strict 3-tier hierarchy — hero readout, secondary readout, label — and stop there; more tiers blur together. Medium weight reads better than regular on dark themes; reserve bold for data values. Pick a hard floor for body text size on the target background and test it on the actual target display, not just a high-DPI dev screen.
 - **Consistency across equivalent elements:** any set of conceptually-equivalent readouts (e.g. five meters that are "the same kind of thing") must share one font size/weight and one refresh rate — a mismatch reads as a bug even when each element is correct in isolation.
-- **Meters / data visualizations:** stacked colour zones (green/amber/red), not whole-element colour change — only the portion in each zone shows that zone's colour. Align reference lines (0 line, baseline) across all parallel meter/graph groups in the same panel. Never show a scale-based visual without printed markings. Any counter that can grow unbounded needs an explicit display ceiling so layout never breaks at high values.
+- **Meters / data visualizations:** stacked colour zones (green/amber/red), not whole-element colour change — only the portion in each zone shows that zone's colour. Align reference lines (0 line, baseline) across all parallel meter/graph groups in the same panel. Never show a scale-based visual without printed markings. Any counter that can grow unbounded needs an explicit display ceiling so layout never breaks at high values. Global tick rate: `kMeterTickHz = 30` (~33.3ms) — every meter bar polls at this same rate; asymmetric ballistics easing (`kMeterRiseMs = 15`, `kMeterFallMs = 250`) rides on top of that same tick, it is not a separate timer.
 - **Window/panel behaviour:** a fixed, non-resizable window is the strong default — it trades flexibility for zero scaling bugs and pixel-perfect alignment, which matters more than resizing for most plugin UIs. Pop-out/auxiliary panels must never move or resize the main window when toggled. Minimal header (branding/status only) + footer toolbar (controls) keeps the eye on the content area.
+- **Interactive-control opacity:** every clickable/draggable control (knob, button, combo
+  box, slider, handle) defaults to `kIdleOpacity = 0.88f`, rising to `kHoverOpacity = 1.0f`
+  on mouse-over.
+- **Hover/focus highlight:** draw it *around* the control's bounds (an outer ring/glow
+  extending beyond the hit area) — never a colour wash painted on the control's own
+  surface. A highlight that reads as "on" the control is easy to mistake for a state
+  change in the control itself; keeping it strictly outside avoids that ambiguity.
 
 ---
 
@@ -27,6 +34,9 @@ scales, or invisible hover states — only a screenshot does.
 - Screenshot-audit again after **every** page-level GUI change in Phase 7, not just at milestone gates
 - Fix, re-screenshot, repeat until clean
 - Once the prototype is locked and approved, treat it as the spec to diff the real JUCE implementation against
+- Disregard the `DevPhaseLabel` corner overlay (`CLAUDE.md § 4` Debug Instrumentation) when
+  auditing — it's temporary dev instrumentation, not part of the design, and must never be
+  added to the HTML prototype itself
 
 ---
 
@@ -154,6 +164,45 @@ void MySyncKnob::paint(juce::Graphics& g) {
 }
 ```
 
+### Shared Tooltip Component (build once, thread every knob into it)
+
+The single highest-value UI decision available: **one shared tooltip component**, not a
+per-knob hover label. Every knob/slider/handle-owning component threads a reference to it
+into its constructor rather than building its own hover display.
+
+Owns exactly three things:
+- **Positioning** — fixed clock-position relative to the target (e.g. 2:30), just outside
+  the control's bounds
+- **Fade** — `ComponentAnimator::fadeOut()` on mouse-exit, smooth, ~200ms
+- **Text formatting** — re-queried live on every hover/move/drag, never cached, so it
+  always reflects automation or a value being dragged in real time
+
+Visual spec — literal values, not a description:
+- `kTooltipBackground = 0xFFD9D9D9` (light grey)
+- `kTooltipBorder = 0xFF000000` (black), 1px
+- `kTooltipCornerRadius = 4.0f` (slightly rounded)
+- `kTooltipText = 0xFF000000` (black)
+- `kTooltipHoverDelayMs = 400` — plain hover waits this long before appearing
+- Active-drag shows immediately (no delay) — one bool distinguishing hover vs. drag is
+  enough, don't build two separate code paths for this
+
+Double-click-to-type: pre-fill a small text box with just the numeric value (no unit
+suffix), all text selected, Return commits (parsed/clamped to the parameter's real
+range — a bare `"4"` for a ratio control reads as `4.00`, not rejected), Escape/focus-loss
+cancels. Build this into the shared tooltip class, not bolted onto individual sliders.
+**Do not rely on JUCE's native `setTooltip()`/`TooltipWindow`** — inconsistent timing,
+can't be skinned to this spec.
+
+Replace JUCE's own default before it fights your custom double-click behavior:
+`slider.setDoubleClickReturnValue(false, 0.0);` immediately after every attachment is
+constructed (see `CLAUDE.md § 12`) — otherwise a stationary double-click both opens your
+type-in flow AND silently resets the value to default first.
+
+For custom on-canvas controls (a draggable handle on a graph, not a `Slider`), attach a
+plain `juce::ParameterAttachment` directly rather than hiding a `Slider` behind the
+drawing — its callback already arrives via its own internal `AsyncUpdater`, off the audio
+thread, so there's no need for the extra indirection.
+
 ### Editor Destructor (non-negotiable order)
 
 ```cpp
@@ -200,6 +249,24 @@ Failure to follow this order causes `EXC_BAD_ACCESS` when Logic or any AU host c
 }
 ```
 
+### Undo/Redo Shortcuts
+
+Wire standard keys to the `juce::UndoManager` owned by the Processor (see
+`plugin-architecture/SKILL.md` Threading Model):
+```cpp
+bool [PluginName]Editor::keyPressed(const juce::KeyPress& key) {
+    auto& undo = processor_.getUndoManager();
+    if (key == juce::KeyPress('z', juce::ModifierKeys::commandModifier, 0))
+        return undo.undo();
+    if (key == juce::KeyPress('z', juce::ModifierKeys::commandModifier
+                                    | juce::ModifierKeys::shiftModifier, 0))
+        return undo.redo();
+    return false;
+}
+```
+Scope stays user-initiated changes (GUI gestures, preset loads) — host automation isn't
+recorded onto the undo stack.
+
 ### About Popup
 
 ```cpp
@@ -218,17 +285,24 @@ void [PluginName]Editor::mouseDown(const juce::MouseEvent& e) {
 
 ### Metering (if required)
 
-Use a `juce::Timer`-driven component at 30Hz:
+Use a `juce::Timer`-driven component at the shared `kMeterTickHz = 30` (~33.3ms). The
+asymmetric rise/fall ballistics (`kMeterRiseMs = 15`, `kMeterFallMs = 250`) are an easing
+curve evaluated once per tick, not a second timer — every meter bar in the plugin polls
+and eases on this same 30Hz tick, per the Consistency-across-equivalent-elements default
+above:
 ```cpp
 class LevelMeter : public juce::Component, public juce::Timer {
 public:
     void timerCallback() override {
-        level_ = processor_.getLevelForMeter();   // atomic read
+        const float target = processor_.getLevelForMeter();   // atomic read
+        const float ms = target > displayLevel_ ? kMeterRiseMs : kMeterFallMs;
+        const float coeff = 1.0f - std::exp(-1000.0f / (ms * kMeterTickHz));
+        displayLevel_ += (target - displayLevel_) * coeff;
         repaint();
     }
-    void paint(juce::Graphics& g) override { /* draw bar */ }
+    void paint(juce::Graphics& g) override { /* draw bar using displayLevel_ */ }
 private:
-    float level_ = 0.f;
+    float displayLevel_ = 0.f;
 };
 ```
 
