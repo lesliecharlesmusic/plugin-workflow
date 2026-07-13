@@ -12,24 +12,6 @@ looking for the open-ended DSP research counterpart to this repo, see
 
 ---
 
-## Why This Exists
-
-I'm not a professional software engineer. I'm a musician, producer, and recording/mixing
-engineer. This workflow started as a way to teach myself DSP and audio programming in
-C++, and to understand how audio plugins actually get built, while making small tools
-that genuinely help my own creative process. It's a hobby project, built for learning
-and personal use, not a commercial effort. If you're coming at this from a
-musical background rather than a computer science one, this was built with you in mind.
-
-I have real respect for the engineers doing this professionally, the people behind the
-plugins we all use every day. Their work reflects years of formal training, experience
-earned the hard way, and judgment that no workflow can shortcut. This process can help
-me aim toward that standard of craft, but it can't replace it. AI can accelerate how
-fast I learn and how much I can build. It can't generate wisdom, experience, or the
-years it takes to earn either.
-
----
-
 ## What's Here
 
 ```
@@ -61,6 +43,33 @@ Unlike a fixed-phase checklist, this workflow tracks **state**, not just **proce
   Implementation doc (a build spec — how). The Implementation doc is a mandatory pre-code
   gate produced right before its code phase starts, regardless of plugin size — not
   optional ceremony for "simple enough" plugins
+
+## Phase Roadmap
+
+The fixed process from `CLAUDE.md § 3` — never changes, only the current-phase line
+(`CLAUDE.md § 2`) does. `State Doc` is the file in `Docs/State/` that phase reads from
+and writes into (`CLAUDE.md § 8`); `—` means that phase has no dedicated state doc.
+
+| Phase | Name | Skill | State Doc |
+|---|---|---|---|
+| 0 | Project Setup | *(none — `CLAUDE.md § 6` checklist)* | — |
+| 1A | DSP Design | `dsp-research` | `DSP_Design.md` |
+| 1B | Software Architecture | `plugin-architecture` | `Software_Architecture.md` |
+| 2 | CMake + JUCE Skeleton | `build-system` | `Build_Config.md` |
+| 3 | Parameter Architecture | `plugin-architecture` | `Parameters.md` |
+| 4 | DSP Implementation | `dsp-implementation` | `DSP_Implementation.md` |
+| 5 | Advanced DSP | `dsp-implementation` | `DSP_Implementation.md` |
+| 6 | UI Design (HTML) | `plugin-ui` | `UI_Design.md` |
+| 7 | UI Implementation | `plugin-ui` | `UI_Implementation.md` |
+| 8 | Preset System | `plugin-architecture` | `Presets.md` |
+| 9 | Optimization | `plugin-optimization` | `Build_Config.md` |
+| 10 | QA & DAW Validation | `plugin-qa` | — |
+| B | Beta Testing | *(none — `Docs/BetaTesting.md`)* | — |
+| R | Release & Distribution | `plugin-release` | — |
+
+`dsp-testing` and `plugin-debugging` aren't tied to a single phase — `dsp-testing` runs
+after every DSP change and mandatorily before Phase R; `plugin-debugging` loads any time
+a build error, crash, or audio artifact needs a forensic fix.
 
 ## Skills
 
@@ -106,6 +115,22 @@ See `CLAUDE.md § 4` for the complete list.
 - CMake 3.22+
 - Xcode (macOS) — Visual Studio builds handled via GitHub Actions CI, no Windows machine needed
 - Claude Code
+
+## Important Note:
+
+I'm not a professional software engineer. I'm a musician, producer, and recording/mixing
+engineer. This workflow started as a way to teach myself DSP and audio programming in
+C++, and to understand how audio plugins actually get built, while making small tools
+that genuinely help my own creative process. It's a hobby project, built for learning
+and personal use, not a commercial effort. If you're coming at this from a
+musical background rather than a computer science one, this was built with you in mind.
+
+I have real respect for the engineers doing this professionally, the people behind the
+plugins we all use every day. Their work reflects years of formal training, experience
+earned the hard way, and judgment that no workflow can shortcut. This process can help
+me aim toward that standard of craft, but it can't replace it. AI can accelerate how
+fast I learn and how much I can build. It can't generate wisdom, experience, or the
+years it takes to earn either.
 
 ## License
 
