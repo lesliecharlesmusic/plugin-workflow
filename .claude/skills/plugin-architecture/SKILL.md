@@ -68,8 +68,8 @@ SmoothedValues            LookAndFeel
 - Owner of every derived/smoothed display value (calibrated meter reading, eased display
   number) — name it explicitly here. The moment more than one GUI component needs the same
   derived value, this section is what stops a second component from re-deriving it (see
-  `CLAUDE.md § 4` State Ownership) — that duplication is the most common recurring bug class
-  in this workflow's project history.
+  `CLAUDE.md § 4` State Ownership) — that duplication is one of the most common recurring
+  bug classes in real-time audio/UI code.
 
 **7. Oversampling Integration**
 - Where in the signal chain

@@ -160,7 +160,7 @@ These apply in every phase, every file, every session:
 
 ### State Ownership
 - The moment a second component (a meter strip, a tracker view, a secondary readout) needs a derived or smoothed value another component already computes, extract it into one shared function or shared engine-side state immediately — never let a second call site re-derive it
-- Duplicated derived-state math is the single most common recurring bug class in this workflow's history: each copy looks correct in isolation, then drifts out of sync with the others over time
+- Duplicated derived-state math is one of the most common recurring bug classes in real-time audio/UI code: each copy looks correct in isolation, then drifts out of sync with the others over time
 
 ### Collaboration Protocol
 - Give the literal value + its symbol name, not a description — `kHeaderFontSize = 22px`, not "the header font." Lets the user self-serve constant changes without a round trip
