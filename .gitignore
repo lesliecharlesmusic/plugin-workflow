@@ -63,3 +63,6 @@ __pycache__/
 # Scratch/render output — golden reference baselines under Docs/GoldenReference/expected/
 # are checked in deliberately; only ignore ad hoc renders outside that folder
 /tmp_renders/
+
+# Local-only notes, not part of the shared template
+/LESSONS LEARNT/

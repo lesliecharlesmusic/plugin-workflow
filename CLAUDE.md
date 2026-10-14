@@ -71,6 +71,9 @@ Claude reads this to know which skill to load and what each phase's gate conditi
 **Pre-code gates:** Phase 4 opens by producing and getting approval on `Docs/State/DSP_Implementation.md`
 (engine-by-engine build spec) before any DSP `.cpp` is generated. Phase 7 opens the same way with
 `Docs/State/UI_Implementation.md`. Neither is optional, regardless of plugin size — see § 8.
+**Lessons Learnt (mandatory, every phase):** At the close of every phase, ask whether anything from
+that phase belongs in `LESSONS LEARNT/Lessons_[PluginName].md` — and proactively mid-phase too, the
+moment a fix costs 2+ expensive iteration rounds and generalizes beyond this plugin. See § 4.
 
 ---
 
@@ -182,6 +185,22 @@ These apply in every phase, every file, every session:
 - Mandatory removal gate: `plugin-release` deletes the overlay code and
   `DevPhaseLabel.h` entirely before any release build — not a flag to flip, actually gone
 
+### Lessons Learnt Protocol
+- At Phase 0, create `LESSONS LEARNT/Lessons_[PluginName].md` (gitignored, local-only — see
+  `.gitignore` and § 14) using the same generalized-rule-first format as prior projects'
+  lessons files: state the reusable rule first, then a one-line example from *this* project
+  for context
+- Log a lesson the moment a bug, design decision, or architectural issue takes **two or
+  more expensive iteration rounds** to actually resolve, AND the underlying fix generalizes
+  beyond this specific plugin (not plugin-specific trivia) — when both conditions are met,
+  proactively ask the user whether to add it; don't wait to be asked
+- Mandatory end-of-phase check (§ 3): before closing out any phase, ask whether anything
+  from that phase belongs in the lessons file — run this every phase even when nothing felt
+  wrong, the same way the Architecture Review (§ 8) runs on a schedule rather than only on
+  suspicion of drift
+- Never commit or push this file — it is personal, cross-project knowledge for the next
+  build, not part of the shippable plugin or the shared template
+
 ---
 
 ## 5. Plugin Specification Summary
@@ -217,10 +236,12 @@ Run once. Check off each item.
 - [ ] `pluginval` downloaded
 - [ ] Logic Pro available for AU testing
 - [ ] Reaper or Ableton available for VST3 testing
-- [ ] GitHub repo created (see `Docs/GitHub.md`)
+- [ ] GitHub repo created (see `Docs/GitHub.md`) — a new, plugin-specific repo, **never**
+      the `plugin-workflow` template repo (see § 14)
 - [ ] `Docs/PluginSpec.md` fully completed
 - [ ] This `CLAUDE.md` fully filled in
 - [ ] All files in `Docs/State/` initialised (templates already in place)
+- [ ] `LESSONS LEARNT/Lessons_[PluginName].md` created (see § 4 Lessons Learnt Protocol)
 - [ ] Phase status updated to: Phase 1A / NOT STARTED
 
 ---
@@ -400,6 +421,8 @@ Full handoff templates: `Docs/CrossToolHandoff.md`
 ├── CMakeLists.txt
 ├── .github/workflows/build.yml
 ├── .gitignore
+├── LESSONS LEARNT/
+│   └── Lessons_[PluginName].md        ← local-only, gitignored (§ 4 Lessons Learnt Protocol)
 ├── Source/
 │   ├── Core/
 │   │   └── DevPhaseLabel.h    ← temporary, deleted before release (§ 4 Debug Instrumentation)
@@ -465,6 +488,15 @@ Full handoff templates: `Docs/CrossToolHandoff.md`
 - Tag every release: `git tag vX.Y.Z && git push origin vX.Y.Z`
 - Version must match in: `CMakeLists.txt`, `PluginProcessor`, `PluginEditor`, About window, manual, bundle
 
+### Repo Discipline (Never Negotiable)
+- **Never push to the `plugin-workflow` template repo.** Every plugin project is its own
+  dedicated repo, created at Phase 0 (`Docs/GitHub.md` § 6) — all commits, branches, CI
+  runs, and tags from Phase 0 onward live there, never in the template
+- Before any `git push`, confirm `git remote -v` does not point at the template repo —
+  abort and flag it to the user if it does, rather than pushing and asking after
+- By the time Phase 10 QA passes, confirm the dedicated repo is still the one in use —
+  this is the latest point at which drifting back onto the template repo must be caught
+
 ---
 
-*Last updated: [DATE] | Template v2.9*
+*Last updated: [DATE] | Template v2.10*

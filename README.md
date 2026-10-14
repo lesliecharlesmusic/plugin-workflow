@@ -17,6 +17,7 @@ looking for the open-ended DSP research counterpart to this repo, see
 ```
 .
 ├── CLAUDE.md                  Always-in-context project brain: identity, rules, phase router
+├── LESSONS LEARNT/             Local-only, gitignored — cross-project knowledge, not shipped
 ├── Docs/
 │   ├── PluginSpec.md           Fill-in spec form — the source of truth every skill reads from
 │   ├── CrossToolHandoff.md     Templates for moving work between Claude/Gemini/ChatGPT
@@ -106,6 +107,11 @@ read `CLAUDE.md § 6` and walk the Phase 0 checklist with you.
 - One file generated per response, verified before the next
 - Golden reference regression must pass before every release — failures are investigated,
   never silently overwritten
+- A lesson that costs 2+ expensive iteration rounds and generalizes beyond the current
+  plugin gets logged in `LESSONS LEARNT/Lessons_[PluginName].md` — checked mandatorily at
+  the end of every phase, not just when something breaks
+- Never push to this template repo — every plugin project is its own dedicated repo from
+  Phase 0 onward
 
 See `CLAUDE.md § 4` for the complete list.
 
